@@ -1,0 +1,4 @@
+Matlab code to generate isotropically distributed B-tensors for diffusion encoding. Works in analogy with electrostatic repulsion by Jones et al (Jones D.K., Horsfield M.A., Simmons A., Magnetic Resonance in
+Medicine. 1999;42(3):515-525) except the charges 'live' in on the 3-dimensional sphere in 4 dimensions (the 3-sphere instead of the 2-sphere).
+Main file is S3isotropic which generates a uniform set of unit quaternions (equivalent to rotations). quat_to_euler converts those to Euler angles, quat_to_frame to directions for DDE or TDE. S2thenSO3optim is a two step optimization procedure: first the axis of rotation is optimized on the 2-sphere, then the rotation angle is optimized such that overall energy on 3-sphere is minimized. rotmat is a helper file to convert unit quaternions to rotations.
+Submitted to MRM.
