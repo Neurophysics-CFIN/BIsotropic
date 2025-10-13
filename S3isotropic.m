@@ -94,13 +94,36 @@ end
 elecprob.Objective = mean(1 ./ (pdist(R, d) + 1e-16));
 
 % Generate an initial guess
-x0 = randn(N, 4);
-x0 = x0 ./ vecnorm(x0, 2, 2);  % Normalize to lie on the sphere
-init.t = x0(:, 1);
-init.x = x0(:, 2);
-init.y = x0(:, 3);
-init.z = x0(:, 4);
+% x0 = randn(N, 4);
+% x0 = x0 ./ vecnorm(x0, 2, 2);  % Normalize to lie on the sphere
+% init.t = x0(:, 1);
+% init.x = x0(:, 2);
+% init.y = x0(:, 3);
+% init.z = x0(:, 4);
+% --- Deterministic uniform SO(3) init via Hopf–Kronecker sequence (any N) ---
+i    = (0:N-1)';                         % 0..N-1
+alpha = (sqrt(5)-1)/2;                   % irrational stride (~0.618...)
+beta  = sqrt(2)-1;                       % another irrational (~0.4142)
 
+phi1 = 2*pi*mod(i*alpha,1);              % ∈ [0,2π)
+phi2 = 2*pi*mod(i*beta ,1);              % ∈ [0,2π)
+u    = -1 + 2*(i+0.5)/N;                 % uniform in cos(2*psi) ∈ (-1,1)
+psi  = 0.5*acos(u);                      % ∈ (0,π/2)
+
+C = cos(psi);  S = sin(psi);
+
+% Quaternion q = [t x y z] on S^3 → SO(3) after antipodal identification
+Q = [C.*cos(phi1), C.*sin(phi1), S.*cos(phi2), S.*sin(phi2)];
+
+% Choose a canonical representative for q ≡ -q (lexicographic tie-break)
+neg = Q(:,1) < 0 | (Q(:,1) == 0 & (Q(:,2) < 0 | (Q(:,2) == 0 & (Q(:,3) < 0 | (Q(:,3) == 0 & Q(:,4) < 0)))));
+Q(neg,:) = -Q(neg,:);
+Q = Q ./ vecnorm(Q,2,2);                 % exact unit norm
+
+init.t = Q(:,1);
+init.x = Q(:,2);
+init.y = Q(:,3);
+init.z = Q(:,4);
 
 % Solve the optimization problem
 [sol, fval, exitflag, output] = solve(elecprob, init, 'Options', options);
