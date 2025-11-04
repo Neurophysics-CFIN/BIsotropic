@@ -33,7 +33,10 @@ elseif abs(beta-pi) < 1e-16
 else
     thplus = atan2(z,t);
     thminus = atan2(-x,y);
-    alpha = (thplus - thminus);
-    gamma = (thplus + thminus);
+    % alpha = (thplus - thminus); %ORIGINAL
+    % gamma = (thplus + thminus);
+    alpha = (thplus + thminus); 
+    gamma = (thplus - thminus);
+    
 end
 end

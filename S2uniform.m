@@ -46,6 +46,7 @@ if visualize
     for j = 1:N
         x_ = q(j,:);
         plot3(x_(1),x_(2),x_(3),'.r','MarkerSize',12);
+        plot3(-x_(1),-x_(2),-x_(3),'.r','MarkerSize',12);
     end
     nexttile;
     axis equal; hold on;
@@ -81,9 +82,9 @@ function [x, y, z, fval, exitflag, output, d] = electrostatic_repulsion(N, metri
     if nargin == 2
         switch metric
             case "euclid"
-                d = @(r1, r2) sqrt(sum((r1 - r2).^2, 2)) / 2;
+                d = @(r1, r2) sqrt(max(0,min(1,2-2*abs(r1*r2')))) / 2;
             case "geodesic"
-                d = @(r1, r2) acos(max(-1,min(1,r1 * r2'))) / pi;
+                d = @(r1, r2) acos(max(0,min(1,abs(r1 * r2')))) / pi;
             otherwise
                 error("Invalid metric");
         end
@@ -91,7 +92,6 @@ function [x, y, z, fval, exitflag, output, d] = electrostatic_repulsion(N, metri
 
     % Define the objective function: energy computation using pairwise distances
     R = [x, y, z]; % Combine the variables into a matrix of coordinates
-    R = [R; -R];  % Mirror the points to enforce symmetry
     energyExpr = fcn2optimexpr(@(X)mean((pdist(X, d) + eps).^-1, 'all'),R);  % Electrostatic energy formula
 
     % Set the objective function for the optimization problem
@@ -105,7 +105,7 @@ function [x, y, z, fval, exitflag, output, d] = electrostatic_repulsion(N, metri
         'MaxIterations', 1e3 * N, ...
         'Display', 'none', ...  % Optional display
         'EnableFeasibilityMode', true);
-    x0 = randn(N, 3);
+    x0 = util.sph_fibonacci(N);
     x0 = x0 ./ vecnorm(x0, 2, 2);  % Normalize to lie on the sphere
 
     init.x = x0(:, 1);
@@ -118,6 +118,9 @@ function [x, y, z, fval, exitflag, output, d] = electrostatic_repulsion(N, metri
     x = sol.x;
     y = sol.y;
     z = sol.z;
+    neg = z < 0 | (z==0 & (y < 0 | (y==0 & (x < 0 )))); %put on one hemisphere
+    x(neg) = -x(neg); y(neg) = -y(neg); z(neg) = -z(neg);
+
 
     % Display output message if the optimization was not successful
     if exitflag ~= 1
@@ -126,62 +129,3 @@ function [x, y, z, fval, exitflag, output, d] = electrostatic_repulsion(N, metri
         disp("End")
     end
 end
-
-
-% function [x, y, z, fval, exitflag, output, d] = electrostatic_repulsion(N, metric)
-% % Define lower and upper bounds for x, y, z
-% lb = -ones(N, 3);  % Lower bound: -1 for all coordinates
-% ub = ones(N, 3);   % Upper bound: 1 for all coordinates
-% 
-% % Initial guess for x, y, z
-% x0 = randn(N, 3);
-% x0 = x0 ./ vecnorm(x0, 2, 2);  % Normalize initial points to lie on the sphere
-% 
-% % Metric selection for distance calculation
-% if nargin == 2
-%     switch metric
-%         case "euclid"
-%             d = @(r1, r2) sqrt(sum((r1 - r2).^2, 2)) / 2;
-%         case "geodesic"
-%             d = @(r1, r2) acos(max(-1,min(1,r1 * r2'))) / pi;
-%         otherwise
-%             error("Invalid metric");
-%     end
-% end
-% 
-% % Objective function: energy computation using pdist with selected metric
-%     function energy = objective_func(X)
-%         R = [X; -X];  % Mirror the points to enforce symmetry
-%         energy = mean((pdist(R, d) + eps).^-1);
-%     end
-% 
-% % Non-linear constraint: points must lie on the surface of a sphere
-%     function [c, ceq] = sphere_constraint(X)
-%         ceq = sum(X.^2, 2) - 1;  % Constraint: x^2 + y^2 + z^2 = 1 for each point
-%         c = [];  % No inequality constraint
-%     end
-% 
-% % Optimization options
-% options = optimoptions('fmincon', ...
-%     'Algorithm', 'interior-point', ...
-%     'SubproblemAlgorithm', 'cg', ...
-%     'MaxFunctionEvaluations', 1e3 * N^2, ...
-%     'MaxIterations', 1e3 * N, ...
-%     'Display', 'none', ...  % Optional display
-%     'EnableFeasibilityMode', true);
-% 
-% % Run fmincon
-% [sol, fval, exitflag, output] = fmincon(@objective_func, x0, [], [], [], [], lb, ub, @sphere_constraint, options);
-% 
-% % Extract x, y, z coordinates
-% x = sol(:, 1);
-% y = sol(:, 2);
-% z = sol(:, 3);
-% 
-% % Display output message if not successful
-% if exitflag ~= 1
-%     fprintf("Exitflag %d from %s\n",exitflag,mfilename);
-%     disp(output.message)
-%     disp("End")
-% end
-% end

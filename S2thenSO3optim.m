@@ -21,35 +21,6 @@ if nargin == 1
     metric = 'geodesic';
 end
 quaternions = optimize_quaternions(directions,metric);
-
-end
-
-function directions = optimize_directions_on_sphere(N)
-% Initial guess: random points on the sphere
-directions = randn(N, 3);
-directions = directions ./ vecnorm(directions, 2, 2);  % Normalize to unit length
-
-% Apply constrained optimization to keep points on the sphere
-options = optimoptions('fmincon', 'Algorithm', 'sqp', 'Display', 'off');
-
-directions = fmincon(@(x) coulomb_energy(x, N), directions(:), [], [], [], [], [], [], @(x) sphere_constraint(x, N), options);
-directions = reshape(directions, [N, 3]);
-directions = directions ./ vecnorm(directions,2,2);
-end
-
-function energy = coulomb_energy(directions, N)
-directions = reshape(directions, [N, 3]);
-S2_dist = @(r1, r2) acos(max(-1,min(1,r1 * r2'))) / pi; %Geodesic
-% S2_dist = @(r1, r2) 1./sqrt(vecnorm(r1-r2,2,2));  %Eucledian
-energy = mean((pdist(directions, S2_dist) + eps).^-1);
-% energy = mean(log(pdist(directions, S2_dist) + eps)); %Real Coulomb in 2D
-end
-
-function [c, ceq] = sphere_constraint(directions, N)
-% Constraint to keep points on the 3D sphere
-directions = reshape(directions, [N, 3]);
-ceq = sum(directions.^2, 2) - 1;  % Ensure each direction has norm 1
-c = [];
 end
 
 function q = direction_to_quaternion(direction, angle)
@@ -115,7 +86,7 @@ angles = fmincon(@(angles) quaternion_energy(angles, directions, metric), angles
 
 % Recompute quaternions with the optimized angles
 quaternions = direction_to_quaternion(directions, angles);
-
+quaternions = util.canon_antipodes(quaternions); %put on hemisphere
 % Normalize quaternions to lie on the 4D unit sphere
 quaternions = quaternions ./ vecnorm(quaternions,2,2);
 end
@@ -124,32 +95,9 @@ function energy = quaternion_energy(angles, directions,metric)
 if nargin ==3
     switch metric
         case 'euclid'
-            q_dist = @(r1, r2) sqrt(min(sum((r1 - r2 + 1e-16).^2, 2),sum((r1 + r2 + 1e-16).^2, 2))) / 2;
+            q_dist = @(r1, r2) sqrt(2 - 2*sqrt((r1*r2').^2)')/2;
         case 'geodesic'
             q_dist = @(r1, r2) 2 * acos(abs(r1 * r2'))' / pi;
-        case 'chordal'
-            q_dist = @(r1, r2) 4 * (1- (r1 * r2').^2)' / pi;
-        case 'bi-invariant'
-            % Axis-angle distance based on rotation angle
-            q_dist = @(r1, r2) arrayfun(@(i) axis_angle_distance(r1, r2(i,:)), (1:size(r2, 1))');
-
-        case 'axis-angle'
-            % Axis-angle difference, combining rotation angle and axis difference
-            q_dist = @(r1, r2) 2 * acos(abs(sum(r1 .* r2, 2))) .* vecnorm(r2 - r1, 2, 2);
-
-        case 'quaternion'
-            % Quaternion-based distance, considering axis and angle
-            q_dist = @(r1, r2) min(vecnorm(r2 - r1, 2, 2), vecnorm(r2 + r1, 2, 2));
-
-        case 'rotation-axes'
-            % Angle between rotation axes combined with rotation angle
-            q_dist = @(r1, r2) acos(tensorprod(r1(2:4), r2(:,2:4), 2, 2)' ./ (vecnorm(r1(2:4)) .* vecnorm(r2(:,2:4), 2, 2))) + ...
-                2 * acos(abs(sum(r1 .* r2, 2)));
-
-        case 'mod-frobenius'
-            % Modified Frobenius norm, difference of rotation matrices
-            q_dist = @(r1, r2) arrayfun(@(i) norm(rotmat(r1) - rotmat(r2(i,:)), 'fro'), (1:size(r2, 1))');
-
         otherwise
             error('Invalid metric');
     end
@@ -162,29 +110,9 @@ end
 q_mat1 = direction_to_quaternion(directions, angles);
 q_mat2 = [q_mat1(:,2) - q_mat1(:,3), -q_mat1(:,1) - q_mat1(:,4), q_mat1(:,1) - q_mat1(:,4), q_mat1(:,2) + q_mat1(:,3)] / sqrt(2);
 q_mat = cat(1,q_mat1,q_mat2);
-[q1,q2,~] = quat_to_frame(q_mat(:,1),q_mat(:,2),q_mat(:,3),q_mat(:,4));
+[q1,q2,~] = util.quat_to_frame(q_mat(:,1),q_mat(:,2),q_mat(:,3),q_mat(:,4));
 Q = cat(2,q1,q2);
-q_dist = @(r1, r2) abs(tensorprod(r1(1:3),r2(:,4:6),2,2)) + abs(tensorprod(r1(4:6),r2(:,1:3),2,2) + tensorprod(r1(1:3),r2(:,1:3),2,2) + tensorprod(r1(4:6),r2(:,4:6),2,2)  );
-energy = mean(1 ./ (pdist(Q, q_dist) + eps)); % Add small value to avoid singularities
-% energy = mean(1 ./ (pdist(q_mat, q_dist) + eps)); % Add small value to avoid singularities
-end
-
-% Helper function to compute axis-angle distance between two quaternions
-function dist = axis_angle_distance(q1, q2)
-% Convert the quaternions to rotation matrices
-R1 = rotmat(q1);
-R2 = rotmat(q2);
-
-% Compute the relative rotation matrix
-R_rel = R1' * R2;
-
-% Compute the trace of the relative rotation matrix
-trace_R = trace(R_rel);
-trace_R = max(min(trace_R, 3), -1);%
-
-% Compute the rotation angle (using the trace formula)
-theta = acos((trace_R - 1) / 2);
-
-% Return the rotation angle as the distance
-dist = theta;
+% q_dist = @(r1, r2) abs(tensorprod(r1(1:3),r2(:,4:6),2,2)) + abs(tensorprod(r1(4:6),r2(:,1:3),2,2) + tensorprod(r1(1:3),r2(:,1:3),2,2) + tensorprod(r1(4:6),r2(:,4:6),2,2)  );
+% energy = mean(1 ./ (pdist(Q, q_dist) + eps)); % Add small value to avoid singularities
+energy = mean(1 ./ (pdist(q_mat, q_dist) + eps)); % Add small value to avoid singularities
 end

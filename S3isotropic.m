@@ -5,7 +5,7 @@ function [t, x, y, z, fval, exitflag, output, d] = S3isotropic(N, DDEflag, metri
 
 % Input variables:
 
-% - N number of rotations (mandatory)
+% - N number of rotations (required)
 
 % - DDEflag (optional), if true (default is false) assumes DDE with rotations of
 % q1 = (1,0,0) and q2 = (0,1,0), and takes into account also DDE time
@@ -48,32 +48,11 @@ options = optimoptions('fmincon', ...
 if nargin == 3
     switch metric
         case 'euclid'
-            d = @(r1, r2) sqrt(sum((r1 - r2 + 1e-16).^2, 2)) / 2;
+        % Euclidean distance on S^3 modulo q ~ -q:
+        % min(||q1 - q2||, ||q1 + q2||)/2  = sqrt(2 - 2|q1·q2|)/2
+        d = @(r1, r2) sqrt(2 - 2*sqrt((r1*r2').^2)')/2;
         case 'geodesic'
             d = @(r1, r2) 2 * acos(sqrt((r1 * r2' + 1e-16).^2))' / pi;
-        case 'chordal'
-            d = @(r1, r2) 4 * (1- (r1 * r2').^2)' / pi;
-        case 'bi-invariant'
-            % Axis-angle distance based on rotation angle
-            d = @(r1, r2) arrayfun(@(i) axis_angle_distance(r1, r2(i,:)), (1:size(r2, 1))');
-
-        case 'axis-angle'
-            % Axis-angle difference, combining rotation angle and axis difference
-            d = @(r1, r2) 2 * acos(abs(sum(r1 .* r2, 2))) .* vecnorm(r2 - r1, 2, 2);
-
-        case 'quaternion'
-            % Quaternion-based distance, considering axis and angle
-            d = @(r1, r2) min(vecnorm(r2 - r1, 2, 2), vecnorm(r2 + r1, 2, 2));
-
-        case 'rotation-axes'
-            % Angle between rotation axes combined with rotation angle
-            d = @(r1, r2) acos(tensorprod(r1(2:4), r2(:,2:4), 2, 2)' ./ (vecnorm(r1(2:4)) .* vecnorm(r2(:,2:4), 2, 2))) + ...
-                2 * acos(abs(sum(r1 .* r2, 2)));
-
-        case 'mod-frobenius'
-            % Modified Frobenius norm, difference of rotation matrices
-            d = @(r1, r2) arrayfun(@(i) norm(rotmat(r1) - rotmat(r2(i,:)), 'fro'), (1:size(r2, 1))');
-
         otherwise
             error('Invalid metric');
     end
@@ -94,36 +73,13 @@ end
 elecprob.Objective = mean(1 ./ (pdist(R, d) + 1e-16));
 
 % Generate an initial guess
-% x0 = randn(N, 4);
-% x0 = x0 ./ vecnorm(x0, 2, 2);  % Normalize to lie on the sphere
-% init.t = x0(:, 1);
-% init.x = x0(:, 2);
-% init.y = x0(:, 3);
-% init.z = x0(:, 4);
-% --- Deterministic uniform SO(3) init via Hopf–Kronecker sequence (any N) ---
-i    = (0:N-1)';                         % 0..N-1
-alpha = (sqrt(5)-1)/2;                   % irrational stride (~0.618...)
-beta  = sqrt(2)-1;                       % another irrational (~0.4142)
+% --- Deterministic uniform SO(3) init via Hopf–Kronecker sequence (any N) --- with canonical representative for q ≡ -q (lexicographic tie-break)
+[t,x,y,z] = util.hopf_kronecker(N);
 
-phi1 = 2*pi*mod(i*alpha,1);              % ∈ [0,2π)
-phi2 = 2*pi*mod(i*beta ,1);              % ∈ [0,2π)
-u    = -1 + 2*(i+0.5)/N;                 % uniform in cos(2*psi) ∈ (-1,1)
-psi  = 0.5*acos(u);                      % ∈ (0,π/2)
-
-C = cos(psi);  S = sin(psi);
-
-% Quaternion q = [t x y z] on S^3 → SO(3) after antipodal identification
-Q = [C.*cos(phi1), C.*sin(phi1), S.*cos(phi2), S.*sin(phi2)];
-
-% Choose a canonical representative for q ≡ -q (lexicographic tie-break)
-neg = Q(:,1) < 0 | (Q(:,1) == 0 & (Q(:,2) < 0 | (Q(:,2) == 0 & (Q(:,3) < 0 | (Q(:,3) == 0 & Q(:,4) < 0)))));
-Q(neg,:) = -Q(neg,:);
-Q = Q ./ vecnorm(Q,2,2);                 % exact unit norm
-
-init.t = Q(:,1);
-init.x = Q(:,2);
-init.y = Q(:,3);
-init.z = Q(:,4);
+init.t = t;
+init.x = x;
+init.y = y;
+init.z = z;
 
 % Solve the optimization problem
 [sol, fval, exitflag, output] = solve(elecprob, init, 'Options', options);
