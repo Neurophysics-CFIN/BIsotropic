@@ -1,4 +1,4 @@
-function val = GFO_cost_fct(x, N, Lmax, Vdeg)
+function val = GFOSO3_cost_fct(x, N, Lmax, bandWeight)
 % x: 4N×1 vector → N×4 quaternions (rows). We normalize rows and canonicalize.
 
 Q = reshape(x, [N,4]);
@@ -23,8 +23,8 @@ for k = 2 : 2*Lmax
         % Wl  = (1 + (ell*(ell+1))/(kappa^2))^(-s);   % Sobolev weight
         chi = U_next;                                % χ_ℓ = U_{2ℓ}(S)
         sum_all = sum(chi(:));
-        term = sum_all / ((2*ell+1)^2);
-        val = val + Vdeg(ell/2+1) * term;
+        term = sum_all;% / ((2*ell+1)^2);
+        val = val + bandWeight(ell/2+1) * term;
     end
     U_prev = U_curr; U_curr = U_next;
 end

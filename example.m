@@ -9,8 +9,8 @@
 B = diag([2 0 3]); % Bmatrix
 N = 24; % number of orientations
 DDEflag = 0; %no dde symmetry
-% cost = 'GFO'; 
-cost = 'electro';
+cost = 'GFO'; 
+% cost = 'electro';
 Lmax = 8; kappa = 8; s = 8;
 Vdeg = util.sobolev(kappa,s,Lmax);
 

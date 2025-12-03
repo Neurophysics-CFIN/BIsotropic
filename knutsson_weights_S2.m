@@ -1,4 +1,4 @@
-function w = knutsson_weights_S2(n, Lw, Vdeg)
+function w = knutsson_weights_S2(n, Lw, bandWeight)
 % Knutsson weights restricted to even spherical-harmonic degrees.
 % n : N x 3 unit vectors
 % Lw: max SH degree used in the fit (only even ℓ up to Lw are included)
@@ -14,7 +14,7 @@ Lw = 2*floor(Lw/2); % force even
 rows = {};
 if nargin < 3
     k = 0:2:Lw;
-    Vdeg = 1./(1+(k/2).^4);%1./(1+k.^2/36);
+    bandWeight = 1./(1+(k/2).^4);%1./(1+k.^2/36);
 end
 vdeg = [];
 % Stack SH blocks for ℓ = 0,2,4,...,Lw   (all m each)
@@ -22,7 +22,7 @@ for l = 0:2:Lw
     Yl = util.sph_harm(l, th, ph);      % (2l+1) x N, m=-l..l (complex)
     rows{end+1} = Yl; %#ok<AGROW>
     % Per-degree weight
-    v_l = Vdeg(l/2+1)/(2*l+1); %distribute weight over 2l + 1 rows
+    v_l = bandWeight(l/2+1)/(2*l+1); %distribute weight over 2l + 1 rows
     vdeg = [vdeg; repmat(v_l, 2*l+1, 1)]; %#ok<AGROW>
 end
 B = vertcat(rows{:});     % M x N, M = sum_{even ℓ≤Lw}(2ℓ+1)

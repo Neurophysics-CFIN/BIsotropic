@@ -1,4 +1,4 @@
-function [t,x,y,z,fval,exitflag,output] = isotropic_SO3_global(N, cost, Lmax, Vdeg)
+function [t,x,y,z,fval,exitflag,output] = isotropic_SO3_global(N, cost, Lmax, bandWeight)
 % Global SO(3) design 
 % Global stage: particleswarm (bounds only)  → HybridFcn: fmincon polish
 % Input:
@@ -20,11 +20,11 @@ x0 = cat(1,t(:),x(:),y(:),z(:));
 
 if strcmp(cost,"GFO")
     % --- Objective handle (numeric, bounds-only; normalizes inside) ---
-    obj = @(x) GFOSO3_cost_fct(x,N,Lmax,Vdeg);
+    obj = @(x) GFOSO3_cost_fct(x,N,Lmax,bandWeight);
 elseif strcmp(cost,"electro")
-    obj = @(x) electroSO3_cost_fct(x,N,true);
+    obj = @(x) electroSO3_cost_fct(x,N,false);
 else
-    error('Invalid cost function specified. Choose either "Knut" or "electro".');
+    error('Invalid cost function specified. Choose either "GFO" or "electro".');
 end
 
 % --- particleswarm options (seed swarm near Hopf–Kronecker, enable hybrid polish) ---

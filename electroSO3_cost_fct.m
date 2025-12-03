@@ -28,6 +28,7 @@ if nargin == 4 && addpen
 
 else
     val = mean(1 ./ (w(~isnan(w)) + 1e-12));
+    % val = mean(1 ./ (w(~isnan(w)) + 1e-12)).^2;
 end
 
 end

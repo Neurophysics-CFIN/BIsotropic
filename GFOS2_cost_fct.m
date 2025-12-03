@@ -1,14 +1,14 @@
-function Fsum  = GFOS2_cost_fct(n, Lmax, Vdeg)
+function Fsum  = GFOS2_cost_fct(n, Lmax, bandWeight)
 n    = util.normalize_rows(n);
 X    = n*n.';                           % x_ij = n_i · n_j
 ells = 0:2:Lmax;
-Vdeg = Vdeg(:).'; Vdeg(1) = 0;
+bandWeight = bandWeight(:).'; bandWeight(1) = 0;
 Fsum = 0;
 for li = 2:numel(ells)                  % skip ℓ=0
     l     = ells(li);
     Pl    = legendreP_matrix(l, X);     % NxN, element-wise P_l(x)
     Kfac  = (2*l+1)/(4*pi);             % addition-theorem factor
-    Fsum  = Fsum + Vdeg(li) * Kfac * sum(Pl, 'all');
+    Fsum  = Fsum + bandWeight(li) * Kfac * sum(Pl, 'all');
 end
 
 end

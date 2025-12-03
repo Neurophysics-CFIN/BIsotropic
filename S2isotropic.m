@@ -1,4 +1,4 @@
-function [x, f,flag,out] = S2isotropic(N, cost, Lmax,Vdeg)
+function [x, f,flag,out] = S2isotropic(N, cost, Lmax,bandWeight)
 % Settings
 % -------------------------------------------------------------------------
 
@@ -15,11 +15,13 @@ opt = optimoptions('fmincon', ...
 
 % Initial step: use spherical Fibonacci as a good seed
 x0 = util.sph_fibonacci(N);
+% x0 = x0 + randn(size(x0))*0.08;
+% x0 = util.normalize_rows(x0);
 
 if strcmp(cost,'electro') % Electrostatic
     obj = @(x)electroS2_cost_fct(x,use_proj);
 elseif strcmp(cost,'GFO')
-    obj = @(x)GFOS2_cost_fct(x,Lmax,Vdeg);
+    obj = @(x)GFOS2_cost_fct(x,Lmax,bandWeight);
 end
 
 lb = -ones(size(x0));
