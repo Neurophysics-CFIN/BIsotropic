@@ -1,4 +1,4 @@
-function [x, f,flag,out] = S2isotropic(N, cost, Lmax,bandWeight)
+function [x, f,flag,out] = S2isotropic(N, cost, Lmax,bandWeight,x0)
 % Settings
 % -------------------------------------------------------------------------
 
@@ -14,7 +14,9 @@ opt = optimoptions('fmincon', ...
     'OptimalityTolerance', 1e-6);
 
 % Initial step: use spherical Fibonacci as a good seed
-x0 = util.sph_fibonacci(N);
+if ~(nargin >= 5 && ~isempty(x0))
+    x0 = util.sph_fibonacci(N);
+end
 % x0 = x0 + randn(size(x0))*0.08;
 % x0 = util.normalize_rows(x0);
 
@@ -36,6 +38,7 @@ problem = struct('objective', obj, ...
     'options', opt);
 [x, f,flag,out] = fmincon(problem);
 x = util.normalize_rows(x);
+x = util.canon_antipodes(x);
 end
 
 

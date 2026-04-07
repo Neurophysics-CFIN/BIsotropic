@@ -1,4 +1,4 @@
-function [t,x,y,z,fval,exitflag,output] = isotropic_SO3_global(N, cost, Lmax, bandWeight)
+function [t,x,y,z,fval,exitflag,output] = isotropic_SO3_global(N, cost, Lmax, bandWeight,x0_in)
 % Global SO(3) design 
 % Global stage: particleswarm (bounds only)  → HybridFcn: fmincon polish
 % Input:
@@ -15,14 +15,19 @@ lb  = -ones(dim,1);        % PSO bounds (loose; we renormalize inside the object
 ub  =  ones(dim,1);
 
 % --- Deterministic initializer (Hopf–Kronecker on S³, antipodal-canonical) ---
-[t,x,y,z] = util.hopf_kronecker(N);
-x0 = cat(1,t(:),x(:),y(:),z(:));
-
+if nargin >=5 && ~isempty(x0_in)
+    x0 = x0_in(:);
+else
+    [t,x,y,z] = util.hopf_kronecker(N);
+    x0 = cat(1,t(:),x(:),y(:),z(:));
+end
 if strcmp(cost,"GFO")
     % --- Objective handle (numeric, bounds-only; normalizes inside) ---
     obj = @(x) GFOSO3_cost_fct(x,N,Lmax,bandWeight);
 elseif strcmp(cost,"electro")
     obj = @(x) electroSO3_cost_fct(x,N,false);
+elseif strcmp(cost,"electroD2")
+    obj = @(x) electroSO3_cost_fct_D2(x,N,false);
 else
     error('Invalid cost function specified. Choose either "GFO" or "electro".');
 end
@@ -31,7 +36,10 @@ end
 % Build an initial swarm around x0 with small random jitters
 swarmSz = max(40, 20*N);                         % heuristic
 J = 0.05;                                        % jitter amplitude (in [-J,J])
-InitSwarm = repmat(x0.', swarmSz, 1) + J*(2*rand(swarmSz,dim)-1);
+InitSwarm = repmat(x0.', swarmSz/2, 1) + J*(2*rand(swarmSz/2,dim)-1);
+Q = randn(N,4,swarmSz/2); Q = Q./vecnorm(Q,2,2); Q = reshape(Q,4*N,swarmSz/2);
+InitSwarm = cat(1,x0',InitSwarm,Q');
+swarmSz = swarmSz + 1;
 
 % HybridFcn: fmincon polish on same bounds; no nonlinear constraints needed
 hybOpt = optimoptions('fmincon', 'Algorithm','interior-point', 'Display','none', ...
@@ -39,12 +47,12 @@ hybOpt = optimoptions('fmincon', 'Algorithm','interior-point', 'Display','none',
 
 psopt = optimoptions('particleswarm', ...
     'SwarmSize', swarmSz, ...
-    'MaxIterations', 1000, ...
+    'MaxIterations', 2000, ...
     'MaxStallIterations', 60, ...
     'UseParallel', false, ...            % set true if you have Parallel Toolbox
     'Display', 'off', ...
     'InitialPoints', InitSwarm, ...
-    'HybridFcn', {@fmincon, hybOpt});
+     'HybridFcn', {@fmincon, hybOpt});
 
 
 % --- Run particleswarm ---
@@ -56,9 +64,11 @@ if strcmp(cost,"electro")
 end
 polishOpt = optimoptions('fmincon','Algorithm','interior-point','SubproblemAlgorithm',...
     'cg', 'Display','none','MaxIterations', 5000, 'OptimalityTolerance', 1e-6,...
-    'StepTolerance',1e-10, 'MaxFunctionEvaluations',1e5);
+    'StepTolerance',1e-6, 'MaxFunctionEvaluations',1e5);
 problem = createOptimProblem('fmincon','objective',obj,'x0',xbest,'lb',lb,'ub',ub,'options',polishOpt);
 [xbest, fbest, eflagPolish, outPolish] = fmincon(problem);
+
+
 
 % --- Extract unit quaternions from best vector (normalize + canonicalize) ---
 Q = reshape(xbest, [N,4]);

@@ -1,9 +1,7 @@
 function [alpha, beta, gamma] = quat_to_euler(t, x, y, z)
-% By Sune N Jespersen. Email: sune@cfin.au.dk
-% Please cite S. Jespersen, MRM XXX (2024)
-% Tested with Matlab 2024b.
+
 % Convert quaternion (t,x,y,z), with t the scalar part, to Euler angles
-% (ZY'Z') of the corresponding rotations.
+% (ZYZ) of the corresponding rotations.
 
 % Ensure inputs are column vectors
 t = t(:);

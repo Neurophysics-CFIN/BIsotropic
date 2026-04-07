@@ -1,4 +1,5 @@
-function R=Rzyz(a,b,g) %Euler to rot matrix
+function R = Rzyz(a,b,g) 
+%Euler angles (Rz(a)Ry(b)Rz(g)) to rotation matrix
 a = a(:);
 b = b(:);
 g = g(:);
